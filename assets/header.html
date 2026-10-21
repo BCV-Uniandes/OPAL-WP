@@ -144,7 +144,8 @@ function frame(now){
   const boxF=1-cl((t-4.4)/0.9); boxMat.opacity=boxF; nodeMat.opacity=boxF; lineMat.opacity=boxF; labMat.opacity=boxF; boxG.visible=boxF>0;
   cardMat.color.copy(WHITE).lerp(CARD,cl((t-5.2)/0.6)*fout*(1-z4));
   polys.forEach((c,k)=>{const u=eo(cl((t-5.7-0.3*k)/0.7));c.outer.visible=u>0;c.outer.scale.setScalar(0.7+0.3*u);c.setOpacity(u*fout);c.spin.rotation.set(0,phi(t),0)});
-  pred.setOpacity(fout);
+  // the copies take over from the prediction when they fly to the polymorphs (TF); then it leaves the scene
+  const pgone=cl((t-TF-0.25)/0.4); pred.setOpacity(fout*(1-pgone)); if(pgone>=1)pred.outer.visible=false;
   // scene 3
   scene.updateMatrixWorld(true);
   const gs=ease(cl((t-9.4)/0.8));
