@@ -13,7 +13,7 @@ html,body{margin:0;background:#ffffff;font:16px/1.5 Inter,system-ui,-apple-syste
 @media (max-width:600px){.hint{display:none}}
 </style>
 </head><body><div id="gal"><div class="bar" id="chips"><span class="hint">Drag to rotate</span></div><div id="view"></div></div>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}</script>
 <script type="module">
 import * as THREE from 'three';
 import {Line2} from 'three/addons/lines/Line2.js';
@@ -24,7 +24,9 @@ const DATA={"methods":["CDVAE","CrystalFlow","DiffCSP","FlowLLM","FlowMM","Matte
 if(self!==top){document.getElementById('gal').style.padding='0';const g=document.getElementById('gal');new ResizeObserver(()=>parent.postMessage({frameH:Math.ceil(g.getBoundingClientRect().height),src:'gallery'},'*')).observe(g)}
 // ---------- renderer / camera: a grid of cards, 4 x 2 on wide screens and 2 x 4 on narrow ones
 const el=document.getElementById('view');
-const ren=new THREE.WebGLRenderer({antialias:true}); ren.setPixelRatio(devicePixelRatio); ren.localClippingEnabled=true; el.appendChild(ren.domElement);
+// draw only while visible; a lost WebGL context (too many on the page) reloads this frame
+let VIS=true; new IntersectionObserver(e=>{VIS=e[0].isIntersecting}).observe(el);
+const ren=new THREE.WebGLRenderer({antialias:true}); ren.setPixelRatio(Math.min(devicePixelRatio,2)); ren.localClippingEnabled=true; el.appendChild(ren.domElement); ren.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();setTimeout(()=>location.reload(),300)});
 const scene=new THREE.Scene(); scene.background=new THREE.Color('#ffffff');
 const cam=new THREE.OrthographicCamera(-1,1,1,-1,-100,100); cam.position.set(0,0,20); cam.lookAt(0,0,0);
 const PW=6.6, PH=5.8, GAP=0.2; let COLS=4, ROWS=2;
@@ -37,7 +39,7 @@ scene.add(new THREE.AmbientLight(0xffffff,1.1));
 const dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(8,12,14); scene.add(dl);
 const fl=new THREE.DirectionalLight(0xffffff,0.6); fl.position.set(-10,-4,-8); scene.add(fl);
 // ---------- helpers (same Crystal Toolkit look as the header and the steps)
-const sph=new THREE.SphereGeometry(0.5,40,28), cyl=new THREE.CylinderGeometry(0.15,0.15,1,20), UP=new THREE.Vector3(0,1,0);
+const sph=new THREE.SphereGeometry(0.5,22,14), cyl=new THREE.CylinderGeometry(0.15,0.15,1,10,1,true), UP=new THREE.Vector3(0,1,0);
 const mat=c=>new THREE.MeshStandardMaterial({color:c,roughness:0.28,metalness:0,transparent:false,opacity:1});
 function op(m,o){m.opacity=o;const tr=o<0.999||!!m.userData.T;if(m.transparent!==tr){m.transparent=tr;m.needsUpdate=true}}
 function polyMeshes(P,X,c){
@@ -124,6 +126,7 @@ let loop=0;
 const qa=new THREE.Quaternion(), qb=new THREE.Quaternion(), va=new THREE.Vector3(), vb=new THREE.Vector3();
 let urlT=new URLSearchParams(location.search).get('t');
 function frame(now){
+  if(!VIS&&urlT===null){requestAnimationFrame(frame);return}
   let t=urlT!==null?parseFloat(urlT):(now-t0)/1000;
   if(urlT===null&&t>TLOOP){select((CI+1)%DATA.comps.length,true);t=0} // the loop moves on to the next composition
   const fo=1-cl((t-TLOOP+0.6)/0.6);
