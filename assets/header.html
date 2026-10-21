@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Header animation</title>
 <style>html,body{margin:0;background:#ffffff;height:100%}#wrap{position:relative;width:100%;height:100vh}#view{width:100%;height:100%}
-#cap{position:absolute;left:10%;top:3%;font:500 clamp(12px,2vw,24px)/1.35 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#4b5563;max-width:86%;opacity:0;pointer-events:none}
+#cap{position:absolute;left:10%;top:1.5%;font:500 clamp(12px,2vw,24px)/1.35 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#4b5563;max-width:86%;opacity:0;pointer-events:none}
 #cap b{display:inline-block;min-width:1.6em;height:1.6em;line-height:1.6em;border-radius:50%;background:#eef1f5;color:#1f2937;text-align:center;margin-right:.55em;font-weight:600}
 #xrd{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}</style>
 </head><body><div id="wrap"><div id="view"></div><svg id="xrd"></svg><div id="cap"></div></div>
@@ -16,7 +16,7 @@ const el=document.getElementById('view');
 const ren=new THREE.WebGLRenderer({antialias:true}); ren.setPixelRatio(devicePixelRatio); el.appendChild(ren.domElement);
 const scene=new THREE.Scene(); scene.background=new THREE.Color('#ffffff');
 const cam=new THREE.OrthographicCamera(-1,1,1,-1,-100,100); cam.position.set(2.2,2.4,20); cam.lookAt(0,0,0);
-const HW=14.2, VS=4.4, BAND=0.3; // BAND: extra space above the scene (fraction of its half-height) kept for the caption
+const HW=14.2, VS=4.4, BAND=0.2; // BAND: extra space above the scene (fraction of its half-height) kept for the caption
 function resize(){const w=el.clientWidth,h=el.clientHeight,a=w/(h*2/(2+BAND));ren.setSize(w,h);const hh=Math.max(HW/a,VS),hw=hh*a;cam.left=-hw;cam.right=hw;cam.top=hh*(1+BAND);cam.bottom=-hh;cam.updateProjectionMatrix()}
 resize(); addEventListener('resize',resize);
 scene.add(new THREE.AmbientLight(0xffffff,1.1));
@@ -140,7 +140,7 @@ function frame(now){
   // scene 2: pan, box leaves, polymorphs appear
   const pan=ease(cl((t-4.4)/1.6)), zz=ease(cl((t-9.4)/1.4)), z4=ease(cl((t-15.0)/1.2));
   // the caption has its own band above the scene (BAND), so the card stays centred while zoomed
-  world.position.x=-PAN*pan-6.0*zz+(6.0-polyX[1])*z4; world.position.y=-0.1*zz-0.05*z4; cam.zoom=1+0.4*zz; cam.updateProjectionMatrix();
+  world.position.x=-PAN*pan-6.0*zz+(6.0-polyX[1])*z4; world.position.y=-0.1*zz-0.05*z4; cam.zoom=1+0.3*zz; cam.updateProjectionMatrix();
   const boxF=1-cl((t-4.4)/0.9); boxMat.opacity=boxF; nodeMat.opacity=boxF; lineMat.opacity=boxF; labMat.opacity=boxF; boxG.visible=boxF>0;
   cardMat.color.copy(WHITE).lerp(CARD,cl((t-5.2)/0.6)*fout*(1-z4));
   polys.forEach((c,k)=>{const u=eo(cl((t-5.7-0.3*k)/0.7));c.outer.visible=u>0;c.outer.scale.setScalar(0.7+0.3*u);c.setOpacity(u*fout);c.spin.rotation.set(0,phi(t),0)});
