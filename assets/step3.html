@@ -3,7 +3,8 @@
 <title>Step 3: Alignment</title>
 <style>html,body{margin:0;background:#ffffff;height:100%}#view{width:100%;height:100vh}</style>
 </head><body><div id="view"></div>
-<script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}</script>
+<script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}
+/* on phones, draw at most 30 frames per second */if(matchMedia('(pointer:coarse)').matches){const R=window.requestAnimationFrame.bind(window);let last=-1e9;window.requestAnimationFrame=cb=>R(function f(t){if(t-last<30){R(f);return}last=t;cb(t)})}</script>
 <script type="module">
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -53,7 +54,11 @@ function build(g,st,{polys=true,ghost=false}={}){ // instanced: one draw call pe
 // all matching lines of a panel in one dashed fat-line object, coloured per segment
 function segs(parent,n,opts){const geo=new LineSegmentsGeometry(), m=new LineMaterial({transparent:true,opacity:0,depthTest:false,vertexColors:true,color:0xffffff,...opts});LM.push(m);
   const sz=new THREE.Vector2();ren.getSize(sz);m.resolution.set(sz.x,sz.y);const l=new LineSegments2(geo,m);l.renderOrder=6;l.frustumCulled=false;parent.add(l);
-  const pos=new Float32Array(n*6), col=new Float32Array(n*6);return {l,m,pos,col,update(){geo.setPositions(pos);geo.setColors(col);l.computeLineDistances()}}}
+  const pos=new Float32Array(n*6), col=new Float32Array(n*6);return {l,m,pos,col,update(){const A=geo.attributes; // buffers are created once, then updated in place (no new GPU buffers every frame)
+    if(!A.instanceStart){geo.setPositions(pos);geo.setColors(col);l.computeLineDistances();return}
+    A.instanceStart.data.array.set(pos);A.instanceStart.data.needsUpdate=true;A.instanceColorStart.data.array.set(col);A.instanceColorStart.data.needsUpdate=true;segDist(A,pos)}}}
+function segDist(A,pos){const d=A.instanceDistanceStart.data; // as LineSegments2.computeLineDistances
+  for(let i=0,j=0;j<d.array.length;i+=6,j+=2){d.array[j]=j?d.array[j-1]:0;d.array[j+1]=d.array[j]+Math.hypot(pos[i+3]-pos[i],pos[i+4]-pos[i+1],pos[i+5]-pos[i+2])}d.needsUpdate=true}
 function roundRect(w,h,r){const s=new THREE.Shape(),x=-w/2,y=-h/2;s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+h-r);s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
   s.lineTo(x+r,y+h);s.quadraticCurveTo(x,y+h,x,y+h-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);return s}
 function flat(obj){obj.quaternion.copy(cam.quaternion);return obj} // 2D elements face the camera
@@ -79,7 +84,7 @@ const panels=DATA.runs.map((run,i)=>{
   const bm=new THREE.MeshBasicMaterial({color:LIGHT,transparent:true,opacity:0,depthTest:false});
   const bgeo=new THREE.ShapeGeometry(roundRect(1,0.34,0.17),8); bgeo.translate(0.5,0,0); const bar=flat(new THREE.Mesh(bgeo,bm)); bar.position.set(BX0,-2.4,0); bar.renderOrder=5; G.add(bar);
   // live value next to the bar
-  const cv=document.createElement('canvas'); cv.width=512; cv.height=128; const tex=new THREE.CanvasTexture(cv); tex.colorSpace=THREE.SRGBColorSpace;
+  const cv=document.createElement('canvas'); cv.width=256; cv.height=64; const tex=new THREE.CanvasTexture(cv); tex.colorSpace=THREE.SRGBColorSpace; tex.generateMipmaps=false; tex.minFilter=THREE.LinearFilter;
   const vm=new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:0,depthTest:false}), val=flat(new THREE.Mesh(new THREE.PlaneGeometry(2.4,0.6),vm)); val.renderOrder=6; G.add(val);
   // keep the copy and its lines inside the panel while they are far from the reference
   const [cx,cy]=PC[i], clip=[[1,0,-(cx-PW/2+0.15)],[-1,0,cx+PW/2-0.15],[0,1,-(cy-PH/2+0.15)],[0,-1,cy+PH/2-0.15]].map(([a,b,c])=>new THREE.Plane(new THREE.Vector3(a,b,0),c));
@@ -87,12 +92,12 @@ const panels=DATA.runs.map((run,i)=>{
   return {G,bgM,ringM,rg,mats,gh,gmats,seg,bar,bm,val,vm,cv,tex,last:'',run,flash:run[0].pairs.map(()=>-9),prev:run[0].pairs.map(p=>p.join())};
 });
 function liveText(G,x,y,w,align){ // small canvas label that can be rewritten (seed name, step counter)
-  const cv=document.createElement('canvas');cv.width=768;cv.height=128;const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
+  const cv=document.createElement('canvas');cv.width=384;cv.height=64;const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;tex.generateMipmaps=false;tex.minFilter=THREE.LinearFilter; // half-size canvas, no mipmaps: cheap to re-upload
   const m=new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:0,depthTest:false}), me=flat(new THREE.Mesh(new THREE.PlaneGeometry(w,w/6),m));me.position.set(x,y,0);me.renderOrder=6;G.add(me);
-  let last='';return {m,set(s,color='#6b7280'){if(s+color===last)return;last=s+color;const g=cv.getContext('2d');g.clearRect(0,0,768,128);g.fillStyle=color;
+  let last='';return {m,set(s,color='#6b7280'){if(s+color===last)return;last=s+color;const g=cv.getContext('2d');g.setTransform(.5,0,0,.5,0,0);g.clearRect(0,0,768,128);g.fillStyle=color;
     g.font='500 72px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif';g.textBaseline='middle';g.textAlign=align;g.fillText(s,align==='left'?6:762,68);tex.needsUpdate=true}}}
 panels.forEach((P,i)=>{P.seed=liveText(P.G,-PW/2+0.35+1.5,PH/2-0.45,3.0,'left');P.seed.set('Seed '+(i+1));P.step=liveText(P.G,PW/2-0.35-1.5,PH/2-0.45,3.0,'right')});
-function setVal(P,v,color=DARK){const s=v.toFixed(v<0.995?3:2)+' Å';if(s+color===P.last)return;P.last=s+color;const g=P.cv.getContext('2d');g.clearRect(0,0,512,128);g.fillStyle=color;
+function setVal(P,v,color=DARK){const s=v.toFixed(v<0.995?3:2)+' Å';if(s+color===P.last)return;P.last=s+color;const g=P.cv.getContext('2d');g.setTransform(.5,0,0,.5,0,0);g.clearRect(0,0,512,128);g.fillStyle=color;
   g.font='600 84px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif';g.textBaseline='middle';g.fillText(s,6,70);P.tex.needsUpdate=true}
 const v3=new THREE.Vector3(), W=new THREE.Vector3(), cT=new THREE.Color();
 function pose(P,fi){ // ghost atoms and bonds at (fractional) frame fi of this restart
@@ -126,8 +131,10 @@ function frame(now){
       const key=a+','+b; if(key!==P.prev[k]&&t>TP0){P.prev[k]=key;P.flash[k]=t}
       const fl=Math.max(0,1-(t-P.flash[k])/0.5); cT.copy(gray6).lerp(blue,fl); S_.col.set([cT.r,cT.g,cT.b,cT.r,cT.g,cT.b],6*k)}); S_.update()}
     P.bar.scale.x=barLen(st.rmse); P.bm.opacity=cl((t-1.7)/0.4)*fout*dim*gone; P.bm.color.copy(light).lerp(blue,win?sel:0); P.ringM.opacity=win?sel*fout:0;
-    setVal(P,st.rmse,win&&sel>0.5?ACC:DARK); P.seed.set('Seed '+(i+1),win&&sel>0.5?ACC:'#6b7280'); const k=Math.min(NF-2,Math.floor(fi)), stp=Math.round(P.run[k].step+(P.run[k+1].step-P.run[k].step)*(fi-k));
-    P.step.set('Step '+stp+' / 400'); P.seed.m.opacity=P.step.m.opacity=pin*fout*dim*gone; P.val.position.set(BX0+barLen(st.rmse)+0.2+1.2,-2.4,0); P.vm.opacity=P.bm.opacity;
+    // labels are canvas textures: rewritten about 15 times per second, not every frame
+    const tk=Math.floor(t*15); if(tk!==P.tk||urlT!==null){P.tk=tk;
+      setVal(P,st.rmse,win&&sel>0.5?ACC:DARK); P.seed.set('Seed '+(i+1),win&&sel>0.5?ACC:'#6b7280'); const k=Math.min(NF-2,Math.floor(fi)), stp=Math.round(P.run[k].step+(P.run[k+1].step-P.run[k].step)*(fi-k));
+      P.step.set('Step '+stp+' / 400')} P.seed.m.opacity=P.step.m.opacity=pin*fout*dim*gone; P.val.position.set(BX0+barLen(st.rmse)+0.2+1.2,-2.4,0); P.vm.opacity=P.bm.opacity;
     // 4. the best restart is kept: it moves to the centre and grows, the others leave
     if(win&&z>0){P.gmats.forEach(([m])=>m.clippingPlanes=null);P.seg.m.clippingPlanes=null}
     if(win){P.G.position.set(PC[i][0]*(1-z),PC[i][1]*(1-z),0);P.G.scale.setScalar(1+0.7*z)}

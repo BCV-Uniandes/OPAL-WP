@@ -13,7 +13,8 @@ html,body{margin:0;background:#ffffff;font:16px/1.5 Inter,system-ui,-apple-syste
 @media (max-width:600px){.hint{display:none}}
 </style>
 </head><body><div id="gal"><div class="bar" id="chips"><span class="hint">Drag to rotate</span></div><div id="view"></div></div>
-<script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}</script>
+<script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}
+/* on phones, draw at most 30 frames per second */if(matchMedia('(pointer:coarse)').matches){const R=window.requestAnimationFrame.bind(window);let last=-1e9;window.requestAnimationFrame=cb=>R(function f(t){if(t-last<30){R(f);return}last=t;cb(t)})}</script>
 <script type="module">
 import * as THREE from 'three';
 import {LineMaterial} from 'three/addons/lines/LineMaterial.js';
@@ -65,7 +66,11 @@ function build(g,st,{polys=true,ghost=false}={}){ // instanced: one draw call pe
 // all matching lines of a panel in one dashed fat-line object, coloured per segment
 function segs(parent,n,opts){const geo=new LineSegmentsGeometry(), m=new LineMaterial({transparent:true,opacity:0,depthTest:false,vertexColors:true,color:0xffffff,...opts});LM.push(m);
   const sz=new THREE.Vector2();ren.getSize(sz);m.resolution.set(sz.x,sz.y);const l=new LineSegments2(geo,m);l.renderOrder=6;l.frustumCulled=false;parent.add(l);
-  const pos=new Float32Array(n*6), col=new Float32Array(n*6);return {l,m,pos,col,update(){geo.setPositions(pos);geo.setColors(col);l.computeLineDistances()}}}
+  const pos=new Float32Array(n*6), col=new Float32Array(n*6);return {l,m,pos,col,update(){const A=geo.attributes; // buffers are created once, then updated in place (no new GPU buffers every frame)
+    if(!A.instanceStart){geo.setPositions(pos);geo.setColors(col);l.computeLineDistances();return}
+    A.instanceStart.data.array.set(pos);A.instanceStart.data.needsUpdate=true;A.instanceColorStart.data.array.set(col);A.instanceColorStart.data.needsUpdate=true;segDist(A,pos)}}}
+function segDist(A,pos){const d=A.instanceDistanceStart.data; // as LineSegments2.computeLineDistances
+  for(let i=0,j=0;j<d.array.length;i+=6,j+=2){d.array[j]=j?d.array[j-1]:0;d.array[j+1]=d.array[j]+Math.hypot(pos[i+3]-pos[i],pos[i+4]-pos[i+1],pos[i+5]-pos[i+2])}d.needsUpdate=true}
 function roundRect(w,h,r){const s=new THREE.Shape(),x=-w/2,y=-h/2;s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+h-r);s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
   s.lineTo(x+r,y+h);s.quadraticCurveTo(x,y+h,x,y+h-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);return s}
 function liveText(G,x,y,w,align,weight=500){ // small rewritable canvas label

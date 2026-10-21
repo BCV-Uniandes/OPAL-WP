@@ -6,7 +6,8 @@
 #cap b{display:inline-block;min-width:1.6em;height:1.6em;line-height:1.6em;border-radius:50%;background:#eef1f5;color:#1f2937;text-align:center;margin-right:.55em;font-weight:600}
 #xrd{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}</style>
 </head><body><div id="wrap"><div id="view"></div><svg id="xrd"></svg><div id="cap"></div></div>
-<script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}</script>
+<script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}
+/* on phones, draw at most 30 frames per second */if(matchMedia('(pointer:coarse)').matches){const R=window.requestAnimationFrame.bind(window);let last=-1e9;window.requestAnimationFrame=cb=>R(function f(t){if(t-last<30){R(f);return}last=t;cb(t)})}</script>
 <script type="module">
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
