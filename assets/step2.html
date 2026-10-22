@@ -68,7 +68,7 @@ function textMat(txt,{size=112,color='#4b5563',w=1024,h=256,align='center'}={}){
 const GRAY='#8b95a1', DARK='#4b5563', LIGHT='#c4cad3', ACC='#2171b5';
 const GS=1.5, VS_=1.4; // scale of the row icons and of the distance values
 // ---------- layout
-const S=MOB?0.36:0.45, PRED=MOB?new THREE.Vector3(-3.9,6.9,0):new THREE.Vector3(-10.4,0.4,0), ROWX=MOB?-3.9:-2.3, ROWY=MOB?[2.4,-1.0,-4.4]:[3.8,0,-3.8], BX0=MOB?0.8:4.0, BLEN=MOB?3.6:7.0, DBP=MOB?new THREE.Vector3(0.4,-1.0,0):new THREE.Vector3(-2.3,0,0);
+const S=MOB?0.36:0.45, PRED=MOB?new THREE.Vector3(-4.25,6.9,0):new THREE.Vector3(-10.4,0.4,0), ROWX=MOB?-4.25:-2.3, ROWY=MOB?[2.4,-1.0,-4.4]:[3.8,0,-3.8], BX0=MOB?0.8:4.0, BLEN=MOB?3.6:7.0, DBP=MOB?new THREE.Vector3(0.4,-1.0,0):new THREE.Vector3(-2.3,0,0);
 const CARD=MOB?{x:0.4,w:15.8,h:11.4}:{x:3.1,w:20.2,h:11.8}, RINGH=MOB?3.2:3.5;
 // the prediction (one full turn while it arrives, so it ends in its reference pose)
 const predG=new THREE.Group(), predIn=new THREE.Group(); predIn.scale.setScalar(S); predG.add(predIn); scene.add(predG);
@@ -96,7 +96,7 @@ const card=flat(new THREE.Mesh(new THREE.ShapeGeometry(roundRect(CARD.w,CARD.h,0
 const polys=DATA.polys.map((P,i)=>{
   // on phones each polymorph is centred on its visible atoms (wide cells would spill into the bars)
   const bx=P.st.X.map(v=>v[0]), by=P.st.X.map(v=>v[1]), cx=MOB?(Math.min(...bx)+Math.max(...bx))/2:0, cy=MOB?(Math.min(...by)+Math.max(...by))/2:0;
-  const Si=MOB?Math.min(S,6.8/(Math.max(...bx)-Math.min(...bx)+1)):S; // and scaled down if it is still too wide
+  const Si=MOB?Math.min(S,6.1/(Math.max(...bx)-Math.min(...bx)+1)):S; // and scaled down to stay clear of the row's icon and bar
   const row=new THREE.Vector3(ROWX-cx*Si,ROWY[i]-cy*Si,0), outer=new THREE.Group(), g=new THREE.Group(); g.scale.setScalar(Si); outer.add(g); scene.add(outer);
   const mats=build(g,P.st), gh=new THREE.Group(); g.add(gh); const gmats=build(gh,DATA.pred,{polys:false,ghost:true});
   const q=P.q?new THREE.Quaternion(...P.q):new THREE.Quaternion(), d=new THREE.Vector3(...P.d), p0=PRED.clone().sub(row).divideScalar(Si);

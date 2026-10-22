@@ -11,8 +11,9 @@ html,body{margin:0;background:#ffffff;font:16px/1.5 Inter,system-ui,-apple-syste
 .hint{margin-left:auto;color:#6b7280;font-size:13px}
 #view{width:100%;touch-action:pan-y;cursor:grab} #view:active{cursor:grabbing}
 @media (max-width:600px){.hint{display:none}}
+#mchips[hidden]{display:none} #mchips .tab{font-size:13px;padding:4px 11px} /* phones: method chips */
 </style>
-</head><body><div id="gal"><div class="bar" id="chips"><span class="hint">Drag to rotate</span></div><div id="view"></div></div>
+</head><body><div id="gal"><div class="bar" id="chips"><span class="hint">Drag to rotate</span></div><div class="bar" id="mchips" hidden></div><div id="view"></div></div>
 <script>/* three.js: served with the page (lib/three) when online, from the CDN when the file is opened locally */{const b=location.protocol==='file:'?'https://cdn.jsdelivr.net/npm/three@0.160.0/':'./lib/three/',s=document.createElement('script');s.type='importmap';s.textContent=JSON.stringify({imports:{three:b+'build/three.module.min.js','three/addons/':b+'examples/jsm/'}});document.currentScript.after(s)}
 /* on phones, draw at most 30 frames per second */if(matchMedia('(pointer:coarse)').matches){const R=window.requestAnimationFrame.bind(window);let last=-1e9;window.requestAnimationFrame=cb=>R(function f(t){if(t-last<30){R(f);return}last=t;cb(t)})}</script>
 <script type="module">
@@ -35,7 +36,10 @@ const LM=[]; // fat-line materials need the viewport size
 // fat lines are sized in pixels: thinner when the cards are drawn smaller (phones), so they keep the desktop proportions
 const PPU=960/(4*6.6+3*0.2); let LWK=1;
 const cellC=i=>[(i%COLS-(COLS-1)/2)*(PW+GAP),((ROWS-1)/2-Math.floor(i/COLS))*(PH+GAP)];
-function resize(){const w=el.clientWidth;COLS=w<560?2:4;ROWS=8/COLS;const gw=COLS*PW+(COLS-1)*GAP,gh=ROWS*PH+(ROWS-1)*GAP,h=Math.round(w*gh/gw);
+// phones (narrow): a single card, the method chosen with its own chips; wider screens: all eight cards
+let ONE=false, MI=-1;
+function resize(){const w=el.clientWidth, one=w<560; if(one!==ONE){ONE=one;document.getElementById('mchips').hidden=!ONE;if(cur)setTimeout(()=>select(CI))}
+  COLS=ONE?1:4;ROWS=ONE?1:8/COLS;const gw=COLS*PW+(COLS-1)*GAP,gh=ROWS*PH+(ROWS-1)*GAP,h=Math.round(w*gh/gw);
   ren.setSize(w,h);cam.left=-gw/2;cam.right=gw/2;cam.top=gh/2;cam.bottom=-gh/2;cam.updateProjectionMatrix();
   LWK=Math.min(1,w/gw/PPU);LM.forEach(m=>{m.resolution.set(w,h);m.linewidth=m.userData.lw*LWK});
   if(cur)place()}
@@ -95,7 +99,8 @@ function select(ci,auto=false){ // auto: next composition of the loop, keeps the
   const S=Math.min(2.5/((bx[1]-bx[0])/2+0.5),1.6/((by[1]-by[0])/2+0.5),0.56), OX=-S*(bx[0]+bx[1])/2, OY=SY-S*(by[0]+by[1])/2;
   const VMAX=Math.max(...cur.preds.map(p=>p.value)); cur.bar=v=>0.22+(BLEN-0.22)*Math.sqrt(Math.min(1,v/VMAX)); // square-root scale, as step 3
   cur.best=cur.preds.reduce((b,p,i)=>p.value<cur.preds[b].value?i:b,0);
-  for(let i=0;i<8;i++){
+  if(ONE&&MI<0)MI=cur.best; // phones start on the method that wins this composition
+  for(const i of ONE?[MI+1]:[0,1,2,3,4,5,6,7]){
     const G=new THREE.Group(); scene.add(G);
     const bgM=new THREE.MeshBasicMaterial({color:'#ffffff',depthWrite:false,depthTest:false}); // opaque card, faded by colour
     const bg=new THREE.Mesh(new THREE.ShapeGeometry(roundRect(PW,PH,0.45),20),bgM); bg.renderOrder=-1; G.add(bg);
@@ -113,14 +118,15 @@ function select(ci,auto=false){ // auto: next composition of the loop, keeps the
       P.bm=new THREE.MeshBasicMaterial({color:LIGHT,transparent:true,opacity:0,depthTest:false});
       const bgeo=new THREE.ShapeGeometry(roundRect(1,0.26,0.13),8); bgeo.translate(0.5,0,0); P.barM=new THREE.Mesh(bgeo,P.bm); P.barM.position.set(BX0,BY,0); P.barM.renderOrder=5; G.add(P.barM);
       P.val=liveText(G,0,BY,2.4,'left',600); lab.set(METH[i-1]);
+      if(ONE){P.id=liveText(G,0,PH/2-0.42,3.2,'right');P.id.set(cur.ref_id)} // phones: no reference card, so its id goes on the method's card
     }
     panels.push(P);
   }
-  place(); [...document.querySelectorAll('.tab')].forEach((b,j)=>b.classList.toggle('on',j===ci));
+  place(); [...chips.querySelectorAll('.tab')].forEach((b,j)=>b.classList.toggle('on',j===ci)); [...mchips.querySelectorAll('.tab')].forEach((b,j)=>b.classList.toggle('on',j===MI));
 }
 let TS=1; // label scale: larger on narrow screens, where the cards are drawn smaller
 function place(){ // card positions, label sizes and the clipping planes that keep a far-away copy inside its card
-  TS=COLS===2?1.7:1.25;
+  TS=ONE?1.05:1.25;
   panels.forEach((P,i)=>{P.lab.me.scale.setScalar(TS);P.lab.me.position.x=-PW/2+0.3+1.6*TS;if(P.id){P.id.me.scale.setScalar(TS);P.id.me.position.set(PW/2-0.3-1.6*TS,COLS===2?BY:PH/2-0.42,0)}if(P.val)P.val.me.scale.setScalar(TS); // narrow cards: the mp-id goes to the empty bar row
     const [cx,cy]=cellC(i);P.G.position.set(cx,cy,0);P.clip=[[1,0,-(cx-PW/2+0.12)],[-1,0,cx+PW/2-0.12],[0,1,-(cy-PH/2+0.12)],[0,-1,cy+PH/2-0.12]].map(([a,b,c])=>new THREE.Plane(new THREE.Vector3(a,b,0),c));
     P.mats.forEach(([m])=>m.clippingPlanes=P.clip); // rotated structures stay inside their card
@@ -128,6 +134,8 @@ function place(){ // card positions, label sizes and the clipping planes that ke
 // chips
 const chips=document.getElementById('chips'), hint=chips.firstChild;
 DATA.comps.forEach((c,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML=c.formula.replace(/(\d+)/g,'<sub>$1</sub>');b.onclick=()=>select(i);chips.insertBefore(b,hint)});
+const mchips=document.getElementById('mchips');
+METH.forEach((m,k)=>{const b=document.createElement('button');b.className='tab';b.textContent=m;b.onclick=()=>{MI=k;select(CI)};mchips.appendChild(b)});
 // drag to rotate every structure together
 let drag=null; const QX=new THREE.Quaternion(), QY=new THREE.Quaternion(), AX=new THREE.Vector3(1,0,0), AY=new THREE.Vector3(0,1,0);
 el.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];el.setPointerCapture(e.pointerId)});
@@ -144,12 +152,12 @@ let urlT=new URLSearchParams(location.search).get('t');
 function frame(now){
   if(!VIS&&urlT===null){requestAnimationFrame(frame);return}
   let t=urlT!==null?parseFloat(urlT):(now-t0)/1000;
-  if(urlT===null&&t>TLOOP){select((CI+1)%DATA.comps.length,true);t=0} // the loop moves on to the next composition
+  if(urlT===null&&t>TLOOP){select(ONE?CI:(CI+1)%DATA.comps.length,true);t=0} // the loop moves on to the next composition (phones replay the chosen one)
   const fo=1-cl((t-TLOOP+0.6)/0.6);
   panels.forEach((P,i)=>{
     const pin=cl((t-0.07*i)/0.5); P.bgM.color.copy(WHITE).lerp(CARDC,loop?1:pin); P.rg.quaternion.copy(userQ);
     P.lab.m.opacity=loop&&!P.id?1:pin; if(P.id)P.id.m.opacity=pin;
-    if(i===0){P.mats.forEach(([m,o])=>op(m,o*pin*fo));return}
+    if(!P.d){P.mats.forEach(([m,o])=>op(m,o*pin*fo));return}
     const F=P.d.frames, NF=F.length, gin=eo(cl((t-0.7-0.06*i)/0.6)), bare=cl((t-1.0)/0.5)*(1-cl((t-TEND-0.2)/0.6));
     const win=P.k===cur.best, sel=cl((t-TSEL)/0.5), dim=win?1:1-0.6*sel*fo; P.ringM.opacity=win?sel*fo:0;
     P.mats.forEach(([m,o])=>op(m,o*pin*dim*fo*(m.userData.poly?1-bare:1)));
