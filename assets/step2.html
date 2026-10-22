@@ -21,10 +21,14 @@ let VIS=true; new IntersectionObserver(e=>{VIS=e[0].isIntersecting}).observe(el)
 const ren=new THREE.WebGLRenderer({antialias:true}); ren.setPixelRatio(Math.min(devicePixelRatio,2)); el.appendChild(ren.domElement); ren.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();setTimeout(()=>location.reload(),300)});
 const scene=new THREE.Scene(); scene.background=new THREE.Color('#ffffff');
 const cam=new THREE.OrthographicCamera(-1,1,1,-1,-100,100); cam.position.set(1.2,1.6,20); cam.lookAt(0,0,0);
-const HW=13.6, VS=6.3;
-function resize(){const w=el.clientWidth,h=el.clientHeight,a=w/h;ren.setSize(w,h);const hh=Math.max(HW/a,VS),hw=hh*a;cam.left=-hw;cam.right=hw;cam.top=hh;cam.bottom=-hh;cam.updateProjectionMatrix();LM.forEach(m=>m.resolution.set(w,h))}
+// phones (narrow frame): prediction on top, the card of polymorphs below; a resize across the threshold reloads
+const MOB=innerWidth<600; addEventListener('resize',()=>{if((innerWidth<600)!==MOB)location.reload()});
+const HW=MOB?8.5:13.6, VS=MOB?7.9:6.3, CY=MOB?0.8:0, PPU=960/(2*13.6); // CY: vertical offset of the view; PPU: desktop pixels per unit
+// fat lines are sized in pixels: thinner when the scene is drawn smaller, so they keep the desktop proportions
+function resize(){const w=el.clientWidth,h=el.clientHeight,a=w/h;ren.setSize(w,h);const hh=Math.max(HW/a,VS),hw=hh*a;cam.left=-hw;cam.right=hw;cam.top=hh+CY;cam.bottom=-hh+CY;cam.updateProjectionMatrix();
+  const k=Math.min(1,w/(2*hw)/PPU);LM.forEach(m=>{m.resolution.set(w,h);m.linewidth=m.userData.lw*k})}
 const LM=[]; // fat-line materials need the viewport size
-const fat=o=>{const m=new LineMaterial({transparent:true,opacity:0,depthTest:false,...o});LM.push(m);return m};
+const fat=o=>{const m=new LineMaterial({transparent:true,opacity:0,depthTest:false,...o});m.userData.lw=m.linewidth;LM.push(m);return m};
 resize(); addEventListener('resize',resize);
 scene.add(new THREE.AmbientLight(0xffffff,1.1));
 const dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(8,12,14); scene.add(dl);
@@ -64,8 +68,8 @@ function textMat(txt,{size=112,color='#4b5563',w=1024,h=256,align='center'}={}){
 const GRAY='#8b95a1', DARK='#4b5563', LIGHT='#c4cad3', ACC='#2171b5';
 const GS=1.5, VS_=1.4; // scale of the row icons and of the distance values
 // ---------- layout
-const S=0.45, PRED=new THREE.Vector3(-10.4,0.4,0), ROWX=-2.3, ROWY=[3.8,0,-3.8], BX0=4.0, BLEN=7.0, DBP=new THREE.Vector3(-2.3,0,0);
-const CARD={x:3.1,w:20.2,h:11.8};
+const S=MOB?0.36:0.45, PRED=MOB?new THREE.Vector3(-3.9,6.9,0):new THREE.Vector3(-10.4,0.4,0), ROWX=MOB?-3.9:-2.3, ROWY=MOB?[2.4,-1.0,-4.4]:[3.8,0,-3.8], BX0=MOB?0.8:4.0, BLEN=MOB?3.6:7.0, DBP=MOB?new THREE.Vector3(0.4,-1.0,0):new THREE.Vector3(-2.3,0,0);
+const CARD=MOB?{x:0.4,w:15.8,h:11.4}:{x:3.1,w:20.2,h:11.8}, RINGH=MOB?3.2:3.5;
 // the prediction (one full turn while it arrives, so it ends in its reference pose)
 const predG=new THREE.Group(), predIn=new THREE.Group(); predIn.scale.setScalar(S); predG.add(predIn); scene.add(predG);
 const predMats=build(predIn,DATA.pred);
@@ -90,14 +94,17 @@ const cardMat=new THREE.MeshBasicMaterial({color:'#ffffff',depthWrite:false,dept
 const card=flat(new THREE.Mesh(new THREE.ShapeGeometry(roundRect(CARD.w,CARD.h,0.6),24),cardMat)); card.position.set(CARD.x,0,0); card.renderOrder=-1; scene.add(card);
 // polymorphs, each with an aligned translucent copy of the prediction
 const polys=DATA.polys.map((P,i)=>{
-  const row=new THREE.Vector3(ROWX,ROWY[i],0), outer=new THREE.Group(), g=new THREE.Group(); g.scale.setScalar(S); outer.add(g); scene.add(outer);
+  // on phones each polymorph is centred on its visible atoms (wide cells would spill into the bars)
+  const bx=P.st.X.map(v=>v[0]), by=P.st.X.map(v=>v[1]), cx=MOB?(Math.min(...bx)+Math.max(...bx))/2:0, cy=MOB?(Math.min(...by)+Math.max(...by))/2:0;
+  const Si=MOB?Math.min(S,6.8/(Math.max(...bx)-Math.min(...bx)+1)):S; // and scaled down if it is still too wide
+  const row=new THREE.Vector3(ROWX-cx*Si,ROWY[i]-cy*Si,0), outer=new THREE.Group(), g=new THREE.Group(); g.scale.setScalar(Si); outer.add(g); scene.add(outer);
   const mats=build(g,P.st), gh=new THREE.Group(); g.add(gh); const gmats=build(gh,DATA.pred,{polys:false,ghost:true});
-  const q=P.q?new THREE.Quaternion(...P.q):new THREE.Quaternion(), d=new THREE.Vector3(...P.d), p0=PRED.clone().sub(row).divideScalar(S);
+  const q=P.q?new THREE.Quaternion(...P.q):new THREE.Quaternion(), d=new THREE.Vector3(...P.d), p0=PRED.clone().sub(row).divideScalar(Si);
   // matched pairs: world endpoints, and where each dashed segment ends up inside the bar
-  const W=v=>new THREE.Vector3(...v).multiplyScalar(S).add(row);
+  const W=v=>new THREE.Vector3(...v).multiplyScalar(Si).add(row);
   const pairs=P.match.map(([a,b])=>({a:W(P.ghost[a]),b:W(P.st.X[b]),d:Math.hypot(...P.ghost[a].map((x,k)=>x-P.st.X[b][k]))}));
   const rmse=Math.sqrt(pairs.reduce((s,p)=>s+p.d*p.d,0)/pairs.length);
-  return {P,row,outer,g,mats,gh,gmats,q,d,p0,pairs,rmse};
+  return {P,Si,row,outer,g,mats,gh,gmats,q,d,p0,pairs,rmse};
 });
 const maxR=Math.max(...polys.map(p=>p.rmse)), barLen=v=>0.35+(BLEN-0.35)*v; // bar length from a 0..1 score
 const lineMat=fat({color:0x6b7280,linewidth:2.2,dashed:true,dashSize:0.16,gapSize:0.12});
@@ -135,7 +142,7 @@ polys.forEach((R,i)=>{
   const tm=textMat(R.rmse.toFixed(2)+' Å',{size:96,color:DARK,align:'left'}); R.val=flat(new THREE.Mesh(new THREE.PlaneGeometry(2.4*VS_,0.6*VS_),tm)); R.val.renderOrder=6; scene.add(R.val);
   // blue copy of the value and an outline around the row, shown for the winner (as in the gallery)
   R.valB=flat(new THREE.Mesh(R.val.geometry,textMat(R.rmse.toFixed(2)+' Å',{size:96,color:ACC,align:'left'}))); R.valB.renderOrder=7; scene.add(R.valB);
-  const rs=roundRect(CARD.w-0.8,3.5,0.5); rs.holes.push(roundRect(CARD.w-0.8-0.16,3.5-0.16,0.42));
+  const rs=roundRect(CARD.w-0.8,RINGH,0.5); rs.holes.push(roundRect(CARD.w-0.8-0.16,RINGH-0.16,0.42));
   R.ring=flat(new THREE.Mesh(new THREE.ShapeGeometry(rs,20),new THREE.MeshBasicMaterial({color:ACC,transparent:true,opacity:0,depthTest:false}))); R.ring.position.set(CARD.x,ROWY[i],0); R.ring.renderOrder=7; scene.add(R.ring);
 });
 const maxA=Math.max(...polys.map(R=>R.xrd.area));
@@ -148,7 +155,8 @@ const TG=6.4, DG=2.0, TP=16.0, DP=1.6; // starts and per-row durations of the ge
 // after each pass the other rows dim and the smallest distance travels to the prediction as its score;
 // the geometric result clears (GOFF) before the physical pass starts
 const GDIM=TG+3*DG+0.1, GFLY=GDIM+0.5, GOFF=15.2, PDIM=TP+3*DP+0.1, PFLY=PDIM+0.5;
-const DOCK=PRED.clone().add(new THREE.Vector3(0,-2.5,0)), V3=(x,y)=>new THREE.Vector3(x,y,0);
+const DOCK=MOB?new THREE.Vector3(BX0+0.55,PRED.y,0):PRED.clone().add(new THREE.Vector3(0,-2.5,0)), // where the winning score docks: right of the prediction on phones, below it on desktop
+      V3=(x,y)=>new THREE.Vector3(x,y,0);
 function score(bar,icon,val,L,y,m){ // move a row's bar (with its icon and value) from the card to below the prediction
   const b=V3(BX0,y).lerp(V3(DOCK.x-0.55,DOCK.y),m); bar.position.copy(b); icon.position.set(b.x-0.75*GS,b.y,0);
   if(val) val.forEach(v=>v.position.set(b.x+L+0.25+1.2*VS_,b.y,0))}
@@ -169,7 +177,7 @@ function frame(now){
   dbLine.opacity=dbIn*dbOut; dbLine.color.copy(gray).lerp(blue,pulse); dbLab.material.opacity=dbIn*dbOut;
   cardMat.color.copy(WHITE).lerp(CARDC,cl((t-4.4)/1.0)*fout);
   polys.forEach((R,i)=>{
-    const u=ease(cl((t-4.6-0.2*i)/1.3)); R.outer.visible=t>3.4; R.outer.position.copy(DBP).lerp(R.row,u); R.g.scale.setScalar(S*(0.25+0.75*u)); // the polymorphs wait inside the box until it fades
+    const u=ease(cl((t-4.6-0.2*i)/1.3)); R.outer.visible=t>3.4; R.outer.position.copy(DBP).lerp(R.row,u); R.g.scale.setScalar(R.Si*(0.25+0.75*u)); // the polymorphs wait inside the box until it fades
     const g0=TG+DG*i, bare=cl((t-g0)/0.4)*(1-cl((t-g0-1.9)/0.5));
     const dg=1-0.7*cl((t-GDIM)/0.5)+0.7*cl((t-GOFF)/0.6), dp=1-0.7*cl((t-PDIM)/0.5);
     const dim=(i!==GEO?dg:1)*(i!==PHY?dp:1);

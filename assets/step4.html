@@ -19,10 +19,14 @@ let VIS=true; new IntersectionObserver(e=>{VIS=e[0].isIntersecting}).observe(el)
 const ren=new THREE.WebGLRenderer({antialias:true}); ren.setPixelRatio(Math.min(devicePixelRatio,2)); el.appendChild(ren.domElement); ren.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();setTimeout(()=>location.reload(),300)});
 const scene=new THREE.Scene(); scene.background=new THREE.Color('#ffffff');
 const cam=new THREE.OrthographicCamera(-1,1,1,-1,-100,100); cam.position.set(1.2,1.6,20); cam.lookAt(0,0,0);
-const HW=12.8, VS=5.8, CX=-1.1; // CX: horizontal centre of the view (the layout sits a little left of 0)
-function resize(){const w=el.clientWidth,h=el.clientHeight,a=w/h;ren.setSize(w,h);const hh=Math.max(HW/a,VS),hw=hh*a;cam.left=-hw+CX;cam.right=hw+CX;cam.top=hh;cam.bottom=-hh;cam.updateProjectionMatrix();LM.forEach(m=>m.resolution.set(w,h))}
+// phones (narrow frame): structures and physical visuals on top, the metric card below; a resize across the threshold reloads
+const MOB=innerWidth<600; addEventListener('resize',()=>{if((innerWidth<600)!==MOB)location.reload()});
+const HW=MOB?6.6:12.8, VS=MOB?8.6:5.8, CX=MOB?0:-1.1, CY=MOB?-0.55:0, PPU=960/(2*12.8); // CX, CY: centre of the view; PPU: desktop pixels per unit
+// fat lines are sized in pixels: thinner when the scene is drawn smaller, so they keep the desktop proportions
+function resize(){const w=el.clientWidth,h=el.clientHeight,a=w/h;ren.setSize(w,h);const hh=Math.max(HW/a,VS),hw=hh*a;cam.left=-hw+CX;cam.right=hw+CX;cam.top=hh+CY;cam.bottom=-hh+CY;cam.updateProjectionMatrix();
+  const k=Math.min(1,w/(2*hw)/PPU);LM.forEach(m=>{m.resolution.set(w,h);m.linewidth=m.userData.lw*k})}
 const LM=[]; // fat-line materials need the viewport size
-const fat=o=>{const m=new LineMaterial({transparent:true,opacity:0,depthTest:false,...o});LM.push(m);return m};
+const fat=o=>{const m=new LineMaterial({transparent:true,opacity:0,depthTest:false,...o});m.userData.lw=m.linewidth;LM.push(m);return m};
 resize(); addEventListener('resize',resize);
 scene.add(new THREE.AmbientLight(0xffffff,1.1));
 const dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(8,12,14); scene.add(dl);
@@ -54,18 +58,19 @@ function textMat(txt,{size=112,color='#4b5563',w=1024,h=256,align='center'}={}){
   const t=new THREE.CanvasTexture(c);t.anisotropy=8;t.colorSpace=THREE.SRGBColorSpace;return new THREE.MeshBasicMaterial({map:t,transparent:true,opacity:0,depthTest:false})}
 const GRAY='#8b95a1', DARK='#4b5563', LIGHT='#c4cad3', ACC='#2171b5';
 // ---------- layout: the structures on the left, a card listing the metrics on the right
-const PL=new THREE.Vector3(-9.4,1.4,0), PR=new THREE.Vector3(-2.2,1.4,0);
+const OX=MOB?5.8:0, OY=MOB?3.9:0; // phones: the structures and their physical visuals move up and to the centre
+const PL=new THREE.Vector3(-9.4+OX,1.4+OY,0), PR=new THREE.Vector3(-2.2+OX,1.4+OY,0), DENY=-4.15+OY;
 // metric card: names in one column, values left-aligned right after them (VAL0)
-const CARD={x:7.25,w:7.7,h:8.4}, ROWY=[2.85,0.95,-0.95,-2.85], LX=3.9, VAL0=6.9, VX=VAL0+1.8;
+const CARD=MOB?{x:0,y:-5.5,w:11.4,h:6.8}:{x:7.25,y:0,w:7.7,h:8.4}, ROWY=MOB?[-3.325,-4.775,-6.225,-7.675]:[2.85,0.95,-0.95,-2.85], LS=MOB?1.25:1, LX=MOB?-3.9:3.9, VAL0=MOB?-0.5:6.9, VX=VAL0+1.8; // LS: label scale
 const V=DATA.vals, GEO=DATA.geo, gray6=new THREE.Color('#6b7280'), dark=new THREE.Color(DARK);
 const cardMat=new THREE.MeshBasicMaterial({color:'#ffffff',depthWrite:false,depthTest:false}), WHITE=new THREE.Color('#ffffff'), CARDC=new THREE.Color('#eef1f5');
-const card=flat(new THREE.Mesh(new THREE.ShapeGeometry(roundRect(CARD.w,CARD.h,0.6),24),cardMat)); card.position.set(CARD.x,0,0); card.renderOrder=-1; scene.add(card);
-function label(txt,x,y,align,size=104,color=DARK){const m=flat(new THREE.Mesh(new THREE.PlaneGeometry(4.4,1.1),textMat(txt,{size,color,align,w:1024,h:256})));
-  m.position.set(align==='left'?x+2.2:x-2.2,y,0);m.renderOrder=7;scene.add(m);return m}
+const card=flat(new THREE.Mesh(new THREE.ShapeGeometry(roundRect(CARD.w,CARD.h,0.6),24),cardMat)); card.position.set(CARD.x,CARD.y,0); card.renderOrder=-1; scene.add(card);
+function label(txt,x,y,align,size=104,color=DARK){const m=flat(new THREE.Mesh(new THREE.PlaneGeometry(4.4*LS,1.1*LS),textMat(txt,{size,color,align,w:1024,h:256})));
+  m.position.set(align==='left'?x+2.2*LS:x-2.2*LS,y,0);m.renderOrder=7;scene.add(m);return m}
 // values have their own canvas (left-aligned at VAL0)
 function valueLabel(txt,y){const c=document.createElement('canvas');c.width=1024;c.height=256;const g=c.getContext('2d');g.fillStyle=DARK;g.font='600 104px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
   g.textAlign='left';g.textBaseline='middle';g.fillText(txt,8,134);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;
-  const m=flat(new THREE.Mesh(new THREE.PlaneGeometry(4.4,1.1),new THREE.MeshBasicMaterial({map:t,transparent:true,opacity:0,depthTest:false})));m.position.set(VAL0+2.2,y,0);m.renderOrder=7;scene.add(m);return m}
+  const m=flat(new THREE.Mesh(new THREE.PlaneGeometry(4.4*LS,1.1*LS),new THREE.MeshBasicMaterial({map:t,transparent:true,opacity:0,depthTest:false})));m.position.set(VAL0+2.2*LS,y,0);m.renderOrder=7;scene.add(m);return m}
 const ROWS={A:[['RMSE',V.superpose_rmsd.toFixed(2)+' Å'],['Chamfer',V.chamfer.toFixed(2)+' Å'],['Hausdorff',V.hausdorff.toFixed(2)+' Å'],['Sinkhorn',V.sinkhorn.toFixed(2)+' Å']],
             B:[['XRD',V.xrd_dist.toFixed(2)],['Density',V.density.toFixed(2)+' g/cm³'],['SOAP',V.soap_dist.toFixed(2)],['Energy',V.formation_energy.toFixed(3)+' eV/atom']]};
 const rows={}; for(const k of ['A','B']) rows[k]=ROWS[k].map(([n,v],i)=>({name:label(n,LX,ROWY[i],'left'),dimName:label(n,LX,ROWY[i],'left',104,'#9aa3ad'),val:valueLabel(v,ROWY[i])}));
@@ -94,15 +99,15 @@ const pat={
 const dotM=new THREE.MeshBasicMaterial({color:DARK,transparent:true,opacity:0,depthTest:false}), dotG=new THREE.SphereGeometry(0.08,12,8);
 const dots=GEO.sinkhorn.flatMap(([p,g])=>[0,1/3,2/3].map(ph=>{const m=new THREE.Mesh(dotG,dotM);m.renderOrder=8;scene.add(m);return {m,p,g,ph}}));
 // physical visuals
-const XA={x0:-12.0,x1:-0.4,y0:-5.5,h:2.5};
+const XA={x0:-12.0+OX,x1:-0.4+OX,y0:-5.5+OY,h:2.5};
 const xmax=Math.max(...DATA.xrd[0],...DATA.xrd[1]);
 const xrdL=DATA.xrd.map((ys,k)=>{const g=new LineGeometry();g.setPositions(ys.flatMap((y,i)=>[XA.x0+(XA.x1-XA.x0)*i/(ys.length-1),XA.y0+XA.h*y/xmax,0]));
   const l=new Line2(g,fat({color:k?0x4b5563:0xaab2bc,linewidth:1.8}));l.renderOrder=6;scene.add(l);return l});
 const rhoMax=Math.max(...DATA.rho), BH=2.6, BW=1.9;
 const dens=[PL,PR].map((P,k)=>{const fr=flat(new THREE.Mesh(new THREE.ShapeGeometry((()=>{const s=roundRect(BW,BH,0.2);s.holes.push(new THREE.Path(roundRect(BW-0.12,BH-0.12,0.14).getPoints(16).reverse()));return s})(),12),
-    new THREE.MeshBasicMaterial({color:GRAY,transparent:true,opacity:0,depthTest:false})));fr.position.set(P.x,-4.15,0);fr.renderOrder=6;scene.add(fr);
+    new THREE.MeshBasicMaterial({color:GRAY,transparent:true,opacity:0,depthTest:false})));fr.position.set(P.x,DENY,0);fr.renderOrder=6;scene.add(fr);
   const fg=new THREE.PlaneGeometry(BW-0.24,1);fg.translate(0,0.5,0);const fill=flat(new THREE.Mesh(fg,new THREE.MeshBasicMaterial({color:k?'#8b95a1':'#c4cad3',transparent:true,opacity:0,depthTest:false})));
-  fill.position.set(P.x,-4.15-BH/2+0.12,0);fill.renderOrder=5;scene.add(fill);return {fr,fill,h:(BH-0.24)*DATA.rho[k]/rhoMax}});
+  fill.position.set(P.x,DENY-BH/2+0.12,0);fill.renderOrder=5;scene.add(fill);return {fr,fill,h:(BH-0.24)*DATA.rho[k]/rhoMax}});
 // SOAP: the local environment (r_cut = 4 Å) around the Pd atom of each structure
 const pdIdx=DATA.pred.spp.slice(0,DATA.pred.n).indexOf('Pd'), pdRef=DATA.ref.spp.slice(0,DATA.ref.n).indexOf('Pd');
 const soap=[[prIn,DATA.ghost[pdIdx]],[refIn,DATA.ref.X[pdRef]]].map(([g,c])=>{const m=new THREE.Mesh(new THREE.SphereGeometry(4.0,40,28),new THREE.MeshBasicMaterial({color:'#8b95a1',transparent:true,opacity:0,depthWrite:false}));
@@ -110,7 +115,7 @@ const soap=[[prIn,DATA.ghost[pdIdx]],[refIn,DATA.ref.X[pdRef]]].map(([g,c])=>{co
 const inside=(X,c)=>X.map(p=>Math.hypot(p[0]-c[0],p[1]-c[1],p[2]-c[2])<=4.0);
 const inPr=inside(DATA.ghost,DATA.ghost[pdIdx]), inRef=inside(DATA.ref.X,DATA.ref.X[pdRef]);
 // energy: two levels on a vertical axis (the stored metric is |ΔE|; the prediction is drawn above)
-const EX=-5.65, E0=-5.4, E1=-3.0, axM=new THREE.LineBasicMaterial({color:GRAY,transparent:true,opacity:0,depthTest:false});
+const EX=-5.65+OX, E0=-5.4+OY, E1=-3.0+OY, axM=new THREE.LineBasicMaterial({color:GRAY,transparent:true,opacity:0,depthTest:false});
 const axis=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(EX,E0-0.3,0),new THREE.Vector3(EX,E1+0.5,0)]),axM); axis.renderOrder=6; scene.add(axis);
 const eHi=E1, eLo=E0, levels=[[EX-2.6,EX-0.4,eHi,0xaab2bc],[EX+0.4,EX+2.6,eLo,0x4b5563]].map(([a,b,y,c])=>fatLine(V3(a,y),V3(b,y),{color:c,linewidth:4,world:true}));
 const gap=fatLine(V3(EX,eLo),V3(EX,eHi),{color:0x6b7280,linewidth:2,dashed:true,dashSize:0.14,gapSize:0.1,world:true});
@@ -118,7 +123,7 @@ function V3(x,y){return new THREE.Vector3(x,y,0)}
 // each physical visual gathers into its value, as the geometric lines do
 const xrdG=new THREE.Group(), densG=new THREE.Group(), enG=new THREE.Group(); [xrdG,densG,enG].forEach(g=>scene.add(g));
 xrdL.forEach(l=>xrdG.add(l)); dens.forEach(d=>densG.add(d.fr,d.fill)); enG.add(axis,...levels,gap);
-const CEN={xrd:V3((XA.x0+XA.x1)/2,XA.y0+XA.h/2), dens:V3((PL.x+PR.x)/2,-4.15), en:V3(EX,(E0+E1)/2)};
+const CEN={xrd:V3((XA.x0+XA.x1)/2,XA.y0+XA.h/2), dens:V3((PL.x+PR.x)/2,DENY), en:V3(EX,(E0+E1)/2)};
 function gather(g,c,row,f){const T_=V3(VX-0.9,ROWY[row]), s=1-0.92*f; g.scale.setScalar(s); g.position.copy(c).add(T_.sub(c).multiplyScalar(f)).sub(c.clone().multiplyScalar(s))}
 const soapDisc=[0,1].map(()=>{const m=flat(new THREE.Mesh(new THREE.CircleGeometry(1,40),new THREE.MeshBasicMaterial({color:'#8b95a1',transparent:true,opacity:0,depthTest:false})));m.renderOrder=7;scene.add(m);return m});
 // ---------- timeline

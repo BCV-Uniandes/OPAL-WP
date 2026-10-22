@@ -32,7 +32,7 @@ p{margin:0 0 12px}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border-radius:999px;background:#1f2937;color:#fff;font-weight:500;font-size:15px}
 .btn:hover{background:#111827;text-decoration:none} .btn.todo{background:#9ca3af}
 .teaser{width:100%;aspect-ratio:960/320;border:0;display:block;margin:12px 0 0;background:#fff}
-@media (max-width:600px){.teaser{aspect-ratio:1.9}
+@media (max-width:600px){.teaser{aspect-ratio:1.25}
   #stabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none} #stabs .tab{flex:none} /* step tabs scroll sideways on phones */
   pre{font-size:11.5px}}
 .tldr{font-size:16px;line-height:1.65;margin:0}
@@ -41,12 +41,12 @@ p{margin:0 0 12px}
 .step{display:grid;gap:10px}
 .step .txt{max-width:760px}
 .anim{width:100%;border:0;display:block;background:#fff} /* aspect-ratio of each animation set inline */
+@media (max-width:600px){#sframe{aspect-ratio:9/10!important}} /* phones: the step animations switch to a vertical layout */
 .num{display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:var(--soft);text-align:center;font-weight:600;margin-right:8px}
 .ph{border:2px dashed #d1d5db;border-radius:14px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;text-align:center;padding:12px;background:#fafafa}
 /* results: track switch (segmented) next to the dataset tabs */
 .bars{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.bars .tabs{margin:0}
 .seg{gap:0;border:1px solid var(--line);border-radius:999px;padding:2px}.seg .tab{border:0;padding:4px 14px}
-#galposter{text-align:center} #galposter img{display:block;border-radius:12px} #galposter button{margin-top:12px}
 /* step tabs */
 .stab .n{display:inline-block;width:20px;height:20px;line-height:20px;border-radius:50%;background:var(--tint);color:var(--fg);font-size:12px;font-weight:600;text-align:center;margin-right:7px}
 .stab.on .n{background:#fff;color:var(--fg)}
@@ -174,9 +174,7 @@ footer{padding:28px 0 48px;color:var(--muted);font-size:14px;text-align:center}
 <section id="gallery">
   <h2>Gallery</h2>
   <p class="muted">Each card replays the alignment of one method's prediction onto the closest known polymorph, computed with the OPAL-Bench pipeline.</p>
-  <iframe class="anim" id="galframe" style="height:560px" data-src="assets/gallery.html" title="Gallery: every method aligning to its closest polymorph" loading="lazy"></iframe>
-  <!-- phones: a still of the gallery; the interactive version loads only on request -->
-  <div id="galposter" hidden><img src="assets/gallery_poster.jpg" alt="Gallery: every CSP method aligned to the closest known polymorph of Rb2InCuF6" width="100%"><button class="tab on" id="galload">Load interactive gallery</button></div>
+  <iframe class="anim" id="galframe" style="height:560px" src="assets/gallery.html" title="Gallery: every method aligning to its closest polymorph" loading="lazy"></iframe>
 </section>
 
 <!-- CITATION -->
@@ -210,9 +208,6 @@ const STEPS=[["assets/step1.html", "OPAL-Bench separates methods into two tracks
    clearTimeout(tm);tm=setTimeout(()=>go((k+1)%STEPS.length),DUR[i]*1000)}
  bs.forEach((b,j)=>b.onclick=()=>go(j));
  new IntersectionObserver((e,o)=>{if(e[0].isIntersecting){go(0);o.disconnect()}},{threshold:0.3}).observe(fr)}
-// gallery: interactive on wide screens; on phones a still image until the visitor asks for it
-{const f=document.getElementById('galframe'), P=document.getElementById('galposter'), go=()=>{P.hidden=true;f.hidden=false;f.src=f.dataset.src};
- if(matchMedia('(max-width:600px)').matches){f.hidden=true;P.hidden=false;document.getElementById('galload').onclick=go}else go()}
 // the gallery iframe reports its height
 addEventListener('message',e=>{if(e.data&&e.data.src==='gallery')document.getElementById('galframe').style.height=e.data.frameH+'px'});
 const R={

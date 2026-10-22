@@ -32,9 +32,12 @@ const scene=new THREE.Scene(); scene.background=new THREE.Color('#ffffff');
 const cam=new THREE.OrthographicCamera(-1,1,1,-1,-100,100); cam.position.set(0,0,20); cam.lookAt(0,0,0);
 const PW=6.6, PH=5.8, GAP=0.2; let COLS=4, ROWS=2;
 const LM=[]; // fat-line materials need the viewport size
+// fat lines are sized in pixels: thinner when the cards are drawn smaller (phones), so they keep the desktop proportions
+const PPU=960/(4*6.6+3*0.2); let LWK=1;
 const cellC=i=>[(i%COLS-(COLS-1)/2)*(PW+GAP),((ROWS-1)/2-Math.floor(i/COLS))*(PH+GAP)];
 function resize(){const w=el.clientWidth;COLS=w<560?2:4;ROWS=8/COLS;const gw=COLS*PW+(COLS-1)*GAP,gh=ROWS*PH+(ROWS-1)*GAP,h=Math.round(w*gh/gw);
-  ren.setSize(w,h);cam.left=-gw/2;cam.right=gw/2;cam.top=gh/2;cam.bottom=-gh/2;cam.updateProjectionMatrix();LM.forEach(m=>m.resolution.set(w,h));
+  ren.setSize(w,h);cam.left=-gw/2;cam.right=gw/2;cam.top=gh/2;cam.bottom=-gh/2;cam.updateProjectionMatrix();
+  LWK=Math.min(1,w/gw/PPU);LM.forEach(m=>{m.resolution.set(w,h);m.linewidth=m.userData.lw*LWK});
   if(cur)place()}
 scene.add(new THREE.AmbientLight(0xffffff,1.1));
 const dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(8,12,14); scene.add(dl);
@@ -64,7 +67,7 @@ function build(g,st,{polys=true,ghost=false}={}){ // instanced: one draw call pe
   const mats=[]; g.traverse(o=>{if(o.material&&!mats.some(([m])=>m===o.material))mats.push([o.material,ghost?0.4:o.material.opacity])}); return mats;
 }
 // all matching lines of a panel in one dashed fat-line object, coloured per segment
-function segs(parent,n,opts){const geo=new LineSegmentsGeometry(), m=new LineMaterial({transparent:true,opacity:0,depthTest:false,vertexColors:true,color:0xffffff,...opts});LM.push(m);
+function segs(parent,n,opts){const geo=new LineSegmentsGeometry(), m=new LineMaterial({transparent:true,opacity:0,depthTest:false,vertexColors:true,color:0xffffff,...opts});m.userData.lw=m.linewidth;m.linewidth*=LWK;LM.push(m);
   const sz=new THREE.Vector2();ren.getSize(sz);m.resolution.set(sz.x,sz.y);const l=new LineSegments2(geo,m);l.renderOrder=6;l.frustumCulled=false;parent.add(l);
   const pos=new Float32Array(n*6), col=new Float32Array(n*6);return {l,m,pos,col,update(){const A=geo.attributes; // buffers are created once, then updated in place (no new GPU buffers every frame)
     if(!A.instanceStart){geo.setPositions(pos);geo.setColors(col);l.computeLineDistances();return}
